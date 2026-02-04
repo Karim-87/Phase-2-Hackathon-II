@@ -209,5 +209,9 @@ Wait for consent; never auto-create ADRs. Group related decisions (stacks, authe
 ## Code Standards
 See `.specify/memory/constitution.md` for code quality, testing, performance, security, and architecture principles.
 
+## Active Technologies
+- Python 3.11+ + FastAPI 0.109+, SQLAlchemy 2.0+, python-jose[cryptography], httpx, Pydantic v2 (003-fastapi-better-auth)
+- Neon PostgreSQL (serverless, shared with Better-Auth) (003-fastapi-better-auth)
+
 ## Recent Changes
-- 001-todo-frontend: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+- 003-fastapi-better-auth: Added Python 3.11+ + FastAPI 0.109+, SQLAlchemy 2.0+, python-jose[cryptography], httpx, Pydantic v2

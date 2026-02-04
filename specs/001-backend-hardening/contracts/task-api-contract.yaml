@@ -1,0 +1,485 @@
+openapi: 3.0.3
+info:
+  title: Todo Backend API
+  description: Secure API for managing user tasks with JWT authentication
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+    description: Development server
+  - url: https://api.yourdomain.com
+    description: Production server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Basic health check to verify the API is running
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+
+  /health/db:
+    get:
+      summary: Database health check
+      description: Check database connectivity
+      responses:
+        '200':
+          description: Database is connected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "database connected"
+
+  /health/auth:
+    get:
+      summary: Authentication health check
+      description: Check authentication system
+      responses:
+        '200':
+          description: Authentication system is operational
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "authentication system operational"
+
+  /api/tasks:
+    post:
+      summary: Create a new task
+      description: Create a new task for the authenticated user
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreateRequest'
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      summary: Get tasks for user
+      description: Retrieve all tasks for the authenticated user with optional filtering and pagination
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: priority
+          in: query
+          description: Filter by priority level
+          required: false
+          schema:
+            type: string
+            enum: [urgent_important, not_urgent_important, urgent_not_important, not_urgent_not_importan]
+        - name: completed
+          in: query
+          description: Filter by completion status
+          required: false
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          description: Maximum number of tasks to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          description: Number of tasks to skip
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: sort_by
+          in: query
+          description: Field to sort by
+          required: false
+          schema:
+            type: string
+            enum: [created_at, updated_at, due_datetime, priority, title]
+            default: created_at
+        - name: sort_order
+          in: query
+          description: Sort order (asc or desc)
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/tasks/{task_id}:
+    get:
+      summary: Get a specific task
+      description: Retrieve a specific task for the authenticated user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          description: The ID of the task to retrieve
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Task retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Update a task
+      description: Update an existing task for the authenticated user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          description: The ID of the task to update
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdateRequest'
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Task not found or does not belong to user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Delete a task
+      description: Delete a task for the authenticated user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          description: The ID of the task to delete
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Task deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Task not found or does not belong to user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/tasks/{task_id}/complete:
+    patch:
+      summary: Update task completion status
+      description: Update only the completion status of a task for the authenticated user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          description: The ID of the task to update
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCompletionRequest'
+      responses:
+        '200':
+          description: Task completion status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskCompletionResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Task not found or does not belong to user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    TaskCreateRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          description: The task title
+        description:
+          type: string
+          description: Optional task description
+        due_datetime:
+          type: string
+          format: date-time
+          description: Optional due date/time for the task
+        priority:
+          type: string
+          enum: [urgent_important, not_urgent_important, urgent_not_important, not_urgent_not_importan]
+          default: not_urgent_not_importan
+          description: Priority level based on Eisenhower Matrix
+        is_completed:
+          type: boolean
+          default: false
+          description: Whether the task is completed
+
+    TaskUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          description: The task title
+        description:
+          type: string
+          description: Optional task description
+        due_datetime:
+          type: string
+          format: date-time
+          description: Optional due date/time for the task
+        priority:
+          type: string
+          enum: [urgent_important, not_urgent_important, urgent_not_important, not_urgent_not_importan]
+          description: Priority level based on Eisenhower Matrix
+        is_completed:
+          type: boolean
+          description: Whether the task is completed
+
+    TaskCompletionRequest:
+      type: object
+      required:
+        - completed
+      properties:
+        completed:
+          type: boolean
+          description: New completion status for the task
+
+    TaskResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          description: Whether the operation was successful
+        data:
+          $ref: '#/components/schemas/Task'
+
+    TaskListResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          description: Whether the operation was successful
+        data:
+          type: object
+          properties:
+            tasks:
+              type: array
+              items:
+                $ref: '#/components/schemas/Task'
+            total_count:
+              type: integer
+              description: Total number of tasks matching the filter
+            limit:
+              type: integer
+              description: Number of tasks returned
+            offset:
+              type: integer
+              description: Number of tasks skipped
+
+    TaskCompletionResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          description: Whether the operation was successful
+        data:
+          $ref: '#/components/schemas/Task'
+
+    Task:
+      type: object
+      required:
+        - id
+        - title
+        - priority
+        - is_completed
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the task
+        title:
+          type: string
+          description: The task title
+        description:
+          type: string
+          description: Optional task description
+        due_datetime:
+          type: string
+          format: date-time
+          description: Optional due date/time for the task
+        priority:
+          type: string
+          enum: [urgent_important, not_urgent_important, urgent_not_important, not_urgent_not_importan]
+          description: Priority level based on Eisenhower Matrix
+        is_completed:
+          type: boolean
+          description: Whether the task is completed
+        user_id:
+          type: string
+          format: uuid
+          description: ID of the user who owns this task
+        created_at:
+          type: string
+          format: date-time
+          description: When the task was created
+        updated_at:
+          type: string
+          format: date-time
+          description: When the task was last updated
+
+    Error:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Error message

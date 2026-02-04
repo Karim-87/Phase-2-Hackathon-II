@@ -1,29 +1,46 @@
 import { Task, CreateTaskData, UpdateTaskData } from '@/types/task';
 import { apiClient } from './api-client';
 
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+}
+
+interface TaskListResponse {
+  tasks: Task[];
+  total_count: number;
+  limit: number;
+  offset: number;
+}
+
 class TaskService {
   async getAllTasks(): Promise<Task[]> {
-    return apiClient.get<Task[]>('/api/tasks');
+    const response = await apiClient.get<ApiResponse<TaskListResponse>>('/api/tasks');
+    return response.data?.tasks || [];
   }
 
   async getTaskById(id: string): Promise<Task> {
-    return apiClient.get<Task>(`/api/tasks/${id}`);
+    const response = await apiClient.get<ApiResponse<Task>>(`/api/tasks/${id}`);
+    return response.data;
   }
 
   async createTask(data: CreateTaskData): Promise<Task> {
-    return apiClient.post<Task>('/api/tasks', data);
+    const response = await apiClient.post<ApiResponse<Task>>('/api/tasks', data);
+    return response.data;
   }
 
   async updateTask(id: string, data: UpdateTaskData): Promise<Task> {
-    return apiClient.put<Task>(`/api/tasks/${id}`, data);
+    const response = await apiClient.put<ApiResponse<Task>>(`/api/tasks/${id}`, data);
+    return response.data;
   }
 
   async deleteTask(id: string): Promise<void> {
-    return apiClient.delete<void>(`/api/tasks/${id}`);
+    await apiClient.delete<void>(`/api/tasks/${id}`);
   }
 
   async toggleTaskCompletion(id: string, isCompleted?: boolean): Promise<Task> {
-    return apiClient.patch<Task>(`/api/tasks/${id}/complete`, { is_completed: isCompleted });
+    const response = await apiClient.patch<ApiResponse<Task>>(`/api/tasks/${id}/complete`, { completed: isCompleted });
+    return response.data;
   }
 
   async getTasksWithFilters(
@@ -41,7 +58,8 @@ class TaskService {
     const queryString = params.toString();
     const endpoint = queryString ? `/api/tasks?${queryString}` : '/api/tasks';
 
-    return apiClient.get<Task[]>(endpoint);
+    const response = await apiClient.get<ApiResponse<TaskListResponse>>(endpoint);
+    return response.data?.tasks || [];
   }
 }
 

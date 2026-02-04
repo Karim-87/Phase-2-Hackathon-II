@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useTasks } from '@/hooks/use-tasks';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/components/auth/auth-provider';
 import Link from 'next/link';
 import TaskFilters from '@/components/tasks/task-filters';
 import TaskList from '@/components/tasks/task-list';
+import ModernButton from '@/components/ui/modern-button';
 
 export default function TasksPage() {
   const { tasks, loading, error, applyFilters } = useTasks();
@@ -56,12 +57,11 @@ export default function TasksPage() {
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">All Tasks</h1>
-        <Link
-          href="/tasks/create"
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-        >
-          Create Task
+        <h1 className="text-3xl font-bold text-[rgb(var(--text-primary))]">All Tasks</h1>
+        <Link href="/tasks/create">
+          <ModernButton variant="primary">
+            Create Task
+          </ModernButton>
         </Link>
       </div>
 
@@ -77,12 +77,11 @@ export default function TasksPage() {
 
       {tasks.length === 0 && !loading && (
         <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">No tasks found. Create your first task!</p>
-          <Link
-            href="/tasks/create"
-            className="mt-4 inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Create Task
+          <p className="text-[rgb(var(--text-secondary))] text-lg">No tasks found. Create your first task!</p>
+          <Link href="/tasks/create">
+            <ModernButton variant="primary" className="mt-4">
+              Create Task
+            </ModernButton>
           </Link>
         </div>
       )}

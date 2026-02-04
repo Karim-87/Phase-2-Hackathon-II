@@ -71,7 +71,7 @@ export default function TaskList({ initialTasks = [], onTaskUpdated, onTaskDelet
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid modern-layout-grid">
       {tasks.map((task) => (
         <TaskCard
           key={task.id}

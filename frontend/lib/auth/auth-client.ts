@@ -16,7 +16,7 @@ class AuthClient {
   }
 
   // Parse JWT token to extract user info
-  parseToken(token: string): { userId: string; exp: number } | null {
+  parseToken(token: string): { userId: string; email?: string; name?: string; exp: number } | null {
     try {
       const base64Url = token.split('.')[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -29,7 +29,9 @@ class AuthClient {
 
       const payload = JSON.parse(jsonPayload);
       return {
-        userId: payload.userId || '',
+        userId: payload.user_id || '',  // Backend sends 'user_id', not 'userId'
+        email: payload.email || '',
+        name: payload.name || '',
         exp: payload.exp || 0,
       };
     } catch (e) {

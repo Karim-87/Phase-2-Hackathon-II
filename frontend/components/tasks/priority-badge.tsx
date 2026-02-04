@@ -8,35 +8,39 @@ export default function PriorityBadge({ priority }: PriorityBadgeProps) {
   const getPriorityClass = () => {
     switch (priority) {
       case 'urgent_important':
-        return 'bg-red-600 text-white';
+        return 'priority-urgent-important';
       case 'urgent_not_important':
-        return 'bg-orange-600 text-white';
+        return 'priority-urgent-not-important';
       case 'not_urgent_important':
-        return 'bg-yellow-600 text-white';
+        return 'priority-not-urgent-important';
       case 'not_urgent_not_important':
-        return 'bg-gray-600 text-white';
+        return 'priority-not-urgent-not-important';
       default:
-        return 'bg-gray-600 text-white';
+        return 'priority-not-urgent-not-important';
     }
   };
 
   const getPriorityText = () => {
     switch (priority) {
       case 'urgent_important':
-        return 'Urgent & Important';
+        return 'Do First';
       case 'urgent_not_important':
-        return 'Urgent & Not Important';
+        return 'Delegate';
       case 'not_urgent_important':
-        return 'Not Urgent & Important';
+        return 'Schedule';
       case 'not_urgent_not_important':
-        return 'Not Urgent & Not Important';
+        return 'Eliminate';
       default:
         return priority;
     }
   };
 
   return (
-    <span className={`text-xs px-2 py-1 rounded ${getPriorityClass()}`}>
+    <span
+      className={`priority-badge ${getPriorityClass()}`}
+      role="status"
+      aria-label={`Priority: ${getPriorityText()}`}
+    >
       {getPriorityText()}
     </span>
   );
