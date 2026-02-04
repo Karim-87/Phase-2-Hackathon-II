@@ -1,5 +1,3 @@
-import { getToken } from '@/hooks/use-auth';
-
 class ApiClient {
   private baseUrl: string;
 

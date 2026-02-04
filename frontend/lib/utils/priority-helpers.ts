@@ -67,7 +67,9 @@ export const sortTasksByPriority = (tasks: any[]): any[] => {
   };
 
   return [...tasks].sort((a, b) => {
-    return priorityOrder[a.priority] - priorityOrder[b.priority];
+    const priorityA = a.priority as PriorityLevel;
+    const priorityB = b.priority as PriorityLevel;
+    return priorityOrder[priorityA] - priorityOrder[priorityB];
   });
 };
 

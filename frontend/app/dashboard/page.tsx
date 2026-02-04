@@ -3,19 +3,27 @@
 import { useState } from 'react';
 import { useTasks } from '@/hooks/use-tasks';
 import { useAuth } from '@/components/auth/auth-provider';
+import { PriorityLevel } from '@/types/task';
 import Link from 'next/link';
 import TaskFilters from '@/components/tasks/task-filters';
 import TaskList from '@/components/tasks/task-list';
 import ModernButton from '@/components/ui/modern-button';
 
+interface FilterParams {
+  priority: PriorityLevel | undefined;
+  completed: boolean | undefined;
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+}
+
 export default function DashboardPage() {
   const { tasks, loading, error, applyFilters } = useTasks();
   const { user, isLoading: authLoading } = useAuth();
-  const [filterParams, setFilterParams] = useState({
+  const [filterParams, setFilterParams] = useState<FilterParams>({
     priority: undefined,
     completed: undefined,
     sortBy: 'created_at',
-    sortOrder: 'desc' as const,
+    sortOrder: 'desc',
   });
 
   const handleFilterChange = (newFilters: {
@@ -24,14 +32,15 @@ export default function DashboardPage() {
     sortBy?: string;
     sortOrder?: string;
   }) => {
-    setFilterParams({
-      priority: newFilters.priority,
+    const updatedFilters: FilterParams = {
+      priority: newFilters.priority as PriorityLevel | undefined,
       completed: newFilters.completed,
       sortBy: newFilters.sortBy || 'created_at',
       sortOrder: (newFilters.sortOrder as 'asc' | 'desc') || 'desc',
-    });
+    };
+    setFilterParams(updatedFilters);
     applyFilters({
-      priority: newFilters.priority,
+      priority: newFilters.priority as PriorityLevel | undefined,
       completed: newFilters.completed,
       sortBy: newFilters.sortBy,
       sortOrder: newFilters.sortOrder as 'asc' | 'desc',

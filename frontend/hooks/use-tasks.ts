@@ -102,14 +102,15 @@ export function useTasks() {
     }
 
     // Apply sorting
-    if (params.sortBy) {
+    const sortBy = params.sortBy;
+    if (sortBy) {
       filtered.sort((a, b) => {
         // Get the values to compare
-        let valA: any = a[params.sortBy as keyof Task];
-        let valB: any = b[params.sortBy as keyof Task];
+        let valA: any = a[sortBy as keyof Task];
+        let valB: any = b[sortBy as keyof Task];
 
         // Handle date comparison
-        if (params.sortBy.includes('_datetime') || params.sortBy.includes('_at')) {
+        if (sortBy.includes('_datetime') || sortBy.includes('_at')) {
           valA = new Date(valA);
           valB = new Date(valB);
         }

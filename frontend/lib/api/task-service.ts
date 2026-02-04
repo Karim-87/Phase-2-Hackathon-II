@@ -1,4 +1,4 @@
-import { Task, CreateTaskData, UpdateTaskData } from '@/types/task';
+import { Task, CreateTaskData, UpdateTaskData, PriorityLevel } from '@/types/task';
 import { apiClient } from './api-client';
 
 interface ApiResponse<T> {
