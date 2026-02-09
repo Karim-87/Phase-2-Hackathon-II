@@ -15,5 +15,8 @@ httpx>=0.26.0
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
 
+# Password Hashing
+passlib[bcrypt]>=1.7.4
+
 # Environment
 python-dotenv>=1.0.0

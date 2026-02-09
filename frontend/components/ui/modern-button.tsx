@@ -5,6 +5,7 @@ interface ModernButtonProps {
   variant?: 'primary' | 'secondary' | 'success' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
+  isLoading?: boolean;
   onClick?: () => void;
   className?: string;
   type?: 'button' | 'submit' | 'reset';
@@ -15,6 +16,7 @@ const ModernButton: React.FC<ModernButtonProps> = ({
   variant = 'primary',
   size = 'md',
   disabled = false,
+  isLoading = false,
   onClick,
   className = '',
   type = 'button',
@@ -43,59 +45,56 @@ const ModernButton: React.FC<ModernButtonProps> = ({
     lg: 'px-6 py-3 text-lg',
   };
 
-  // Variant styles based on design tokens
+  // Variant styles — solid colors for visibility
   const variantClasses = {
     primary: `
-      bg-[rgba(var(--primary),0.2)]
-      border-[rgba(var(--primary),0.3)]
-      text-white
-      backdrop-blur-md
-      hover:bg-[rgba(var(--primary),0.3)]
-      hover:border-[rgba(var(--primary),0.4)]
-      focus:ring-[rgba(var(--primary),0.5)]
+    
+      bg-indigo-700
+      border-indigo-700
+      text-black
+      hover:bg-indigo-700
+      focus:ring-indigo-500
     `,
     secondary: `
-      bg-[rgba(var(--secondary),0.2)]
-      border-[rgba(var(--border),0.3)]
-      text-[rgb(var(--text-primary))]
-      backdrop-blur-md
-      hover:bg-[rgba(var(--secondary-hover),0.3)]
-      hover:border-[rgba(var(--border),0.4)]
-      focus:ring-[rgba(var(--primary),0.5)]
+      bg-gray-200
+      border-gray-300
+      text-gray-800
+      hover:bg-gray-300
+      focus:ring-gray-400
     `,
     success: `
-      bg-[rgba(var(--success),0.2)]
-      border-[rgba(var(--success),0.3)]
+      bg-emerald-600
+      border-emerald-700
       text-white
-      backdrop-blur-md
-      hover:bg-[rgba(var(--success),0.3)]
-      hover:border-[rgba(var(--success),0.4)]
-      focus:ring-[rgba(var(--success),0.5)]
+      hover:bg-emerald-700
+      focus:ring-emerald-500
     `,
     danger: `
-      bg-[rgba(var(--danger),0.2)]
-      border-[rgba(var(--danger),0.3)]
+      bg-red-600
+      border-red-700
       text-white
-      backdrop-blur-md
-      hover:bg-[rgba(var(--danger),0.3)]
-      hover:border-[rgba(var(--danger),0.4)]
-      focus:ring-[rgba(var(--danger),0.5)]
+      hover:bg-red-700
+      focus:ring-red-500
     `,
   };
 
-  const classes = `${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${className}`;
+  const isDisabled = disabled || isLoading;
+  const classes = `${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${isLoading ? 'opacity-70' : ''} ${className}`;
 
   return (
     <button
       type={type}
       className={classes}
       onClick={onClick}
-      disabled={disabled}
+      disabled={isDisabled}
       style={{
         borderRadius: 'var(--radius-lg)',
       }}
-      aria-disabled={disabled}
+      aria-disabled={isDisabled}
     >
+      {isLoading && (
+        <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-current border-b-transparent mr-2 align-middle" />
+      )}
       {children}
     </button>
   );

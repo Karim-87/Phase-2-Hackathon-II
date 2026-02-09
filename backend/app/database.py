@@ -95,7 +95,7 @@ async def init_db() -> None:
 
     # Import models to ensure they're registered with SQLAlchemy
     from app.models.base import Base
-    from app.models import User, Session, Account, Verification  # noqa: F401
+    from app.models import User, Session, Account, Verification, Task  # noqa: F401
 
     try:
         async with engine.begin() as conn:

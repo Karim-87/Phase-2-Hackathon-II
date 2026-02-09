@@ -31,6 +31,18 @@ class UserCreate(UserBase):
 
     password: str = Field(..., min_length=8)
 
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        import re
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least 1 uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least 1 lowercase letter")
+        if not re.search(r"[0-9]", v):
+            raise ValueError("Password must contain at least 1 number")
+        return v
+
 
 class UserRead(BaseModel):
     """Schema for reading user data."""

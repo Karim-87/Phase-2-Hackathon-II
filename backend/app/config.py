@@ -90,6 +90,25 @@ class Settings(BaseSettings):
         return f"{self.BETTER_AUTH_URL}/api/auth/jwks"
 
 
+    def validate_production_config(self) -> None:
+        """Validate configuration for production safety. Called on startup."""
+        logger = logging.getLogger(__name__)
+
+        if self.is_production:
+            if not self.BETTER_AUTH_SECRET:
+                raise ValueError(
+                    "BETTER_AUTH_SECRET must be set in production environment"
+                )
+            # Warn if CORS origins contain localhost
+            for origin in self.allowed_origins_list:
+                if "localhost" in origin or "127.0.0.1" in origin:
+                    logger.warning(
+                        "Production CORS origin contains localhost: %s. "
+                        "This is likely a misconfiguration.",
+                        origin,
+                    )
+
+
 @lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance."""

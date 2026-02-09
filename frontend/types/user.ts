@@ -3,4 +3,7 @@ export interface UserSession {
   user_id: string;
   expires_at: string;
   is_authenticated: boolean;
+  name?: string;
+  email?: string;
+  role?: string;
 }

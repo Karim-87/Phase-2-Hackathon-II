@@ -20,27 +20,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // Check for existing token on mount
-  useEffect(() => {
-    const token = localStorage.getItem('jwt_token');
-    if (token) {
-      // Verify token is still valid
-      const tokenPayload = parseJwt(token);
-      if (tokenPayload && tokenPayload.exp * 1000 > Date.now()) {
-        // Token is valid, but we don't have user details yet
-        // We'll need to call an API to get user details
-        // For now, we'll just set a minimal user object
-        setUser({
-          jwt_token: token,
-          user_id: tokenPayload.user_id || '',  // Backend sends 'user_id', not 'userId'
-          expires_at: new Date(tokenPayload.exp * 1000).toISOString(),
-          is_authenticated: true,
-        });
-      }
-    }
-    setIsLoading(false);
-  }, []);
-
   const parseJwt = (token: string) => {
     try {
       const base64Url = token.split('.')[1];
@@ -51,118 +30,124 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
           .join('')
       );
-
       return JSON.parse(jsonPayload);
-    } catch (e) {
-      console.error('Failed to parse JWT:', e);
+    } catch {
       return null;
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const fetchProfile = async (token: string) => {
     try {
-      console.log('SignIn: Starting...', { email, apiUrl: process.env.NEXT_PUBLIC_API_BASE_URL });
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/auth/signin`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` },
       });
-
-      console.log('SignIn: Response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Sign in failed' }));
-        console.error('SignIn: Error response:', errorData);
-        throw new Error(errorData.detail || `Sign in failed: ${response.status}`);
+      if (res.ok) {
+        const profile = await res.json();
+        setUser(prev => prev ? {
+          ...prev,
+          name: profile.name,
+          email: profile.email,
+          role: profile.role,
+        } : prev);
       }
-
-      const data = await response.json();
-      console.log('SignIn: Success data:', data);
-      const token = data.data?.token;
-
-      if (!token) {
-        throw new Error('Token not found in response');
-      }
-
-      localStorage.setItem('jwt_token', token);
-      // Also set cookie for middleware access
-      document.cookie = `jwt_token=${token}; path=/; max-age=${60 * 60 * 24}`; // 24 hours
-      console.log('SignIn: Token saved to localStorage and cookie');
-
-      // Parse token to get user info
-      const tokenPayload = parseJwt(token);
-      console.log('SignIn: Token payload:', tokenPayload);
-
-      setUser({
-        jwt_token: token,
-        user_id: tokenPayload.user_id || data.data?.user_id || '',  // Backend sends 'user_id', not 'userId'
-        expires_at: data.data?.expires_at || new Date(tokenPayload.exp * 1000).toISOString(),
-        is_authenticated: true,
-      });
-
-      console.log('SignIn: Redirecting to dashboard...');
-      router.push('/dashboard');
-    } catch (error) {
-      console.error('Sign in error:', error);
-      throw error;
+    } catch {
+      // Profile fetch is best-effort
     }
   };
 
-  const signUp = async (email: string, password: string, name: string) => {
-    try {
-      console.log('Attempting signup with:', { email, name, apiUrl: process.env.NEXT_PUBLIC_API_BASE_URL });
+  const setCookieSecure = (token: string) => {
+    const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    document.cookie = `jwt_token=${token}; path=/; max-age=86400; SameSite=Lax${isSecure ? '; Secure' : ''}`;
+  };
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/auth/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, name }),
-      });
-
-      console.log('Signup response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Sign up failed' }));
-        console.error('Signup error response:', errorData);
-        throw new Error(errorData.detail || `Sign up failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Signup success, received data');
-
-      const token = data.data?.token;
-
-      if (!token) {
-        throw new Error('Token not found in response');
-      }
-
-      localStorage.setItem('jwt_token', token);
-      // Also set cookie for middleware access
-      document.cookie = `jwt_token=${token}; path=/; max-age=${60 * 60 * 24}`; // 24 hours
-
-      // Parse token to get user info
+  // Check for existing token on mount
+  useEffect(() => {
+    const token = localStorage.getItem('jwt_token');
+    if (token) {
       const tokenPayload = parseJwt(token);
-      setUser({
-        jwt_token: token,
-        user_id: tokenPayload.user_id || data.data?.user_id || '',  // Backend sends 'user_id', not 'userId'
-        expires_at: data.data?.expires_at || new Date(tokenPayload.exp * 1000).toISOString(),
-        is_authenticated: true,
-      });
-
-      router.push('/dashboard');
-    } catch (error) {
-      console.error('Sign up error:', error);
-      throw error;
+      if (tokenPayload && tokenPayload.exp * 1000 > Date.now()) {
+        setUser({
+          jwt_token: token,
+          user_id: tokenPayload.user_id || '',
+          expires_at: new Date(tokenPayload.exp * 1000).toISOString(),
+          is_authenticated: true,
+        });
+        fetchProfile(token);
+      }
     }
+    setIsLoading(false);
+  }, []);
+
+  const signIn = async (email: string, password: string) => {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/auth/signin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: 'Sign in failed' }));
+      throw new Error(errorData.detail || `Sign in failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const token = data.data?.token;
+
+    if (!token) {
+      throw new Error('Token not found in response');
+    }
+
+    localStorage.setItem('jwt_token', token);
+    setCookieSecure(token);
+
+    const tokenPayload = parseJwt(token);
+    setUser({
+      jwt_token: token,
+      user_id: tokenPayload.user_id || data.data?.user_id || '',
+      expires_at: data.data?.expires_at || new Date(tokenPayload.exp * 1000).toISOString(),
+      is_authenticated: true,
+    });
+
+    fetchProfile(token);
+    router.push('/dashboard');
+  };
+
+  const signUp = async (email: string, password: string, name: string) => {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, name }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: 'Sign up failed' }));
+      throw new Error(errorData.detail || `Sign up failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const token = data.data?.token;
+
+    if (!token) {
+      throw new Error('Token not found in response');
+    }
+
+    localStorage.setItem('jwt_token', token);
+    setCookieSecure(token);
+
+    const tokenPayload = parseJwt(token);
+    setUser({
+      jwt_token: token,
+      user_id: tokenPayload.user_id || data.data?.user_id || '',
+      expires_at: data.data?.expires_at || new Date(tokenPayload.exp * 1000).toISOString(),
+      is_authenticated: true,
+    });
+
+    fetchProfile(token);
+    router.push('/dashboard');
   };
 
   const signOut = async () => {
     localStorage.removeItem('jwt_token');
-    // Also remove cookie
     document.cookie = 'jwt_token=; path=/; max-age=0';
     setUser(null);
     router.push('/');

@@ -62,6 +62,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager for startup and shutdown events."""
     # Startup
     logger.info("Starting FastAPI application")
+    settings.validate_production_config()
     await init_db()
     logger.info("Database initialized")
     yield
@@ -119,8 +120,8 @@ async def db_health_check() -> dict[str, str]:
         async with async_session_factory() as session:
             await session.execute(text("SELECT 1"))
         return {"status": "database connected"}
-    except Exception as e:
-        return {"status": "database error", "error": str(e)}
+    except Exception:
+        return {"status": "database error"}
 
 
 @app.get("/", tags=["root"])
@@ -135,7 +136,8 @@ async def root() -> dict[str, str]:
 
 
 # Import and register routers
-from app.routers import auth, users
+from app.routers import auth, tasks, users
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(users.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tasks.router, prefix=settings.API_V1_PREFIX)

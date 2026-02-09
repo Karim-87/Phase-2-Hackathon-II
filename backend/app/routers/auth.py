@@ -5,12 +5,14 @@ Endpoints for signup, signin, JWT validation, session info, and current user pro
 """
 
 import hashlib
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from jose import jwt
+from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,22 +35,44 @@ from app.utils.exceptions import BadRequestError, NotFoundError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Bcrypt password context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Password hashing using hashlib (simple, no extra dependencies)
+
 def hash_password(password: str) -> str:
-    """Hash password using SHA-256 with salt."""
-    salt = secrets.token_hex(16)
-    pwd_hash = hashlib.sha256((password + salt).encode()).hexdigest()
-    return f"{salt}:{pwd_hash}"
+    """Hash password using bcrypt via passlib."""
+    return pwd_context.hash(password)
 
 
-def verify_password(password: str, hashed: str) -> bool:
-    """Verify password against hash."""
+def _legacy_verify_sha256(password: str, hashed: str) -> bool:
+    """Verify password against legacy SHA-256 hash (salt:hash format)."""
     try:
         salt, pwd_hash = hashed.split(":")
         return hashlib.sha256((password + salt).encode()).hexdigest() == pwd_hash
     except ValueError:
         return False
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Verify password against hash. Supports bcrypt and legacy SHA-256."""
+    # Check if this is a bcrypt hash (starts with $2b$ or $2a$)
+    if hashed.startswith(("$2b$", "$2a$")):
+        return pwd_context.verify(password, hashed)
+    # Legacy SHA-256 format: salt:hash
+    return _legacy_verify_sha256(password, hashed)
+
+
+def validate_password_strength(password: str) -> Optional[str]:
+    """Validate password meets strength requirements. Returns error message or None."""
+    if len(password) < 8:
+        return "Password must be at least 8 characters"
+    if not re.search(r"[A-Z]", password):
+        return "Password must contain at least 1 uppercase letter"
+    if not re.search(r"[a-z]", password):
+        return "Password must contain at least 1 lowercase letter"
+    if not re.search(r"[0-9]", password):
+        return "Password must contain at least 1 number"
+    return None
 
 
 def create_access_token(user_id: str, email: str, role: str = "user") -> tuple[str, datetime]:
@@ -62,8 +86,9 @@ def create_access_token(user_id: str, email: str, role: str = "user") -> tuple[s
         "iat": datetime.now(timezone.utc),
         "exp": expires_at,
     }
-    # Use HS256 with the Better-Auth secret for simplicity
-    secret = settings.BETTER_AUTH_SECRET or "dev-secret-change-in-production"
+    secret = settings.BETTER_AUTH_SECRET
+    if not secret:
+        raise ValueError("BETTER_AUTH_SECRET must be set")
     token = jwt.encode(payload, secret, algorithm="HS256")
     return token, expires_at
 
@@ -105,7 +130,19 @@ async def signup(
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email already exists",
+            detail="An account with this email already exists",
+        )
+
+    # Validate password strength
+    password_error = validate_password_strength(request.password)
+    if password_error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error": "Validation failed",
+                "error_code": "VALIDATION_ERROR",
+                "details": {"password": password_error},
+            },
         )
 
     # Create user ID
@@ -122,7 +159,7 @@ async def signup(
     )
     db.add(new_user)
 
-    # Create account with hashed password
+    # Create account with bcrypt-hashed password
     account = Account(
         id=secrets.token_hex(16),
         user_id=user_id,
@@ -195,6 +232,11 @@ async def signin(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
+
+    # Transparent bcrypt migration: if legacy SHA-256, re-hash to bcrypt
+    if not account.password.startswith(("$2b$", "$2a$")):
+        account.password = hash_password(request.password)
+        await db.flush()
 
     # Create JWT token
     token, expires_at = create_access_token(user.id, user.email, user.role)

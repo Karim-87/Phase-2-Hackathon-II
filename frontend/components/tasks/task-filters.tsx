@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PriorityLevel } from '@/types/task';
+import ModernButton from '@/components/ui/modern-button';
 
 interface TaskFiltersProps {
   onFilterChange: (filters: {
@@ -17,7 +18,6 @@ export default function TaskFilters({ onFilterChange }: TaskFiltersProps) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
-    // Apply filters when any filter value changes
     onFilterChange({
       priority: priority || undefined,
       completed: completed === null ? undefined : completed,
@@ -34,14 +34,14 @@ export default function TaskFilters({ onFilterChange }: TaskFiltersProps) {
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow mb-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="modern-card p-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value as PriorityLevel || '')}
-            className="w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 px-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm transition-all"
           >
             <option value="">All Priorities</option>
             <option value="urgent_important">Urgent & Important</option>
@@ -56,7 +56,7 @@ export default function TaskFilters({ onFilterChange }: TaskFiltersProps) {
           <select
             value={completed === null ? '' : completed.toString()}
             onChange={(e) => setCompleted(e.target.value === '' ? null : e.target.value === 'true')}
-            className="w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 px-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm transition-all"
           >
             <option value="">All Tasks</option>
             <option value="false">Pending</option>
@@ -69,7 +69,7 @@ export default function TaskFilters({ onFilterChange }: TaskFiltersProps) {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 px-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm transition-all"
           >
             <option value="created_at">Created Date</option>
             <option value="updated_at">Updated Date</option>
@@ -84,7 +84,7 @@ export default function TaskFilters({ onFilterChange }: TaskFiltersProps) {
           <select
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-            className="w-full rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 px-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm transition-all"
           >
             <option value="desc">Descending</option>
             <option value="asc">Ascending</option>
@@ -93,12 +93,9 @@ export default function TaskFilters({ onFilterChange }: TaskFiltersProps) {
       </div>
 
       <div className="mt-4 flex justify-end">
-        <button
-          onClick={handleReset}
-          className="text-sm font-medium text-blue-600 hover:text-blue-800"
-        >
+        <ModernButton variant="secondary" size="sm" onClick={handleReset}>
           Reset Filters
-        </button>
+        </ModernButton>
       </div>
     </div>
   );

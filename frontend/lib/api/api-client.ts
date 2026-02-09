@@ -1,3 +1,9 @@
+export interface ApiError {
+  message: string;
+  code?: string;
+  status: number;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -5,14 +11,17 @@ class ApiClient {
     this.baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
   }
 
-  async request(endpoint: string, options: RequestInit = {}) {
+  async request<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
 
-    // Get token from auth context
-    const token = localStorage.getItem('jwt_token');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
 
     const config: RequestInit = {
       ...options,
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -22,55 +31,66 @@ class ApiClient {
 
     try {
       const response = await fetch(url, config);
+      clearTimeout(timeout);
 
-      // Handle 401 responses by redirecting to login
       if (response.status === 401) {
-        // Remove invalid token
-        localStorage.removeItem('jwt_token');
-        // In a real app, you might want to redirect to login
-        // For now, we'll just throw the error and let the caller handle it
-        throw new Error('Unauthorized: Please sign in again');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('jwt_token');
+          document.cookie = 'jwt_token=; path=/; max-age=0';
+          window.location.href = '/sign-in';
+        }
+        throw { message: 'Session expired. Please sign in again.', code: 'TOKEN_EXPIRED', status: 401 } as ApiError;
       }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        throw {
+          message: errorData.error || errorData.detail || `Request failed (${response.status})`,
+          code: errorData.error_code,
+          status: response.status,
+        } as ApiError;
       }
 
       return await response.json();
     } catch (error) {
-      console.error(`API request failed: ${url}`, error);
-      throw error;
+      clearTimeout(timeout);
+      if (error && typeof error === 'object' && 'status' in error) {
+        throw error;
+      }
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw { message: 'Request timed out', code: 'TIMEOUT', status: 0 } as ApiError;
+      }
+      throw { message: 'Network error. Please check your connection.', code: 'NETWORK_ERROR', status: 0 } as ApiError;
     }
   }
 
   async get<T>(endpoint: string): Promise<T> {
-    return this.request(endpoint, { method: 'GET' });
+    return this.request<T>(endpoint, { method: 'GET' });
   }
 
-  async post<T>(endpoint: string, data: any): Promise<T> {
-    return this.request(endpoint, {
+  async post<T>(endpoint: string, data: unknown): Promise<T> {
+    return this.request<T>(endpoint, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async put<T>(endpoint: string, data: any): Promise<T> {
-    return this.request(endpoint, {
+  async put<T>(endpoint: string, data: unknown): Promise<T> {
+    return this.request<T>(endpoint, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
-  async patch<T>(endpoint: string, data: any): Promise<T> {
-    return this.request(endpoint, {
+  async patch<T>(endpoint: string, data: unknown): Promise<T> {
+    return this.request<T>(endpoint, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
   async delete<T>(endpoint: string): Promise<T> {
-    return this.request(endpoint, { method: 'DELETE' });
+    return this.request<T>(endpoint, { method: 'DELETE' });
   }
 }
 

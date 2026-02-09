@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.session import Session
 from app.models.account import Account
 from app.models.verification import Verification
+from app.models.task import Task
 
 __all__ = [
     "Base",
@@ -17,4 +18,5 @@ __all__ = [
     "Session",
     "Account",
     "Verification",
+    "Task",
 ]

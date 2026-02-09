@@ -24,8 +24,8 @@ export default function TaskList({ initialTasks = [], onTaskUpdated, onTaskDelet
       setLoading(true);
       const tasksData = await taskService.getAllTasks();
       setTasks(tasksData);
-    } catch (error) {
-      console.error('Failed to load tasks:', error);
+    } catch {
+      // Error handled by loading state — caller can retry
     } finally {
       setLoading(false);
     }
@@ -36,21 +36,22 @@ export default function TaskList({ initialTasks = [], onTaskUpdated, onTaskDelet
       await taskService.deleteTask(taskId);
       setTasks(tasks.filter(task => task.id !== taskId));
       if (onTaskDeleted) onTaskDeleted(taskId);
-    } catch (error) {
-      console.error('Failed to delete task:', error);
+    } catch {
+      // Silently handled — task remains in list as visual indicator
     }
   };
 
   const handleToggleComplete = async (taskId: string) => {
     try {
-      const updatedTask = await taskService.toggleTaskCompletion(taskId);
+      const currentTask = tasks.find(t => t.id === taskId);
+      const updatedTask = await taskService.toggleTaskCompletion(taskId, !currentTask?.is_completed);
       const updatedTasks = tasks.map(task =>
         task.id === taskId ? updatedTask : task
       );
       setTasks(updatedTasks);
       if (onTaskUpdated) onTaskUpdated(updatedTask);
-    } catch (error) {
-      console.error('Failed to toggle task completion:', error);
+    } catch {
+      // Silently handled — task state unchanged as visual indicator
     }
   };
 
@@ -71,7 +72,7 @@ export default function TaskList({ initialTasks = [], onTaskUpdated, onTaskDelet
   }
 
   return (
-    <div className="grid modern-layout-grid">
+    <div className="flex flex-col divide-y divide-gray-200">
       {tasks.map((task) => (
         <TaskCard
           key={task.id}

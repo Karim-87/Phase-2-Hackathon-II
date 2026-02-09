@@ -1,154 +1,135 @@
 """
-Pytest Configuration and Fixtures
+Test Fixtures
 
-Provides async test client, mock JWT, and test database fixtures.
+Async SQLite engine, session factory, FastAPI TestClient with httpx.AsyncClient,
+test user creation helper, JWT token generation helper.
 """
 
-import asyncio
+import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Any, AsyncGenerator, Generator
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import AsyncGenerator
 
 import pytest
-from fastapi import FastAPI
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from jose import jwt
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.config import Settings
+from app.config import settings
 from app.database import get_db
-from app.main import app
 from app.models.base import Base
 
 
-# Test database URL (use SQLite for tests)
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# Test database engine (async SQLite)
+test_engine = create_async_engine(
+    "sqlite+aiosqlite:///./test.db",
+    echo=False,
+    connect_args={"check_same_thread": False},
+)
+
+TestSessionFactory = async_sessionmaker(
+    test_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create an event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+@pytest_asyncio.fixture(autouse=True)
+async def setup_database():
+    """Create all tables before each test and drop after."""
+    from app.models import Account, Session, User, Verification  # noqa: F401
+    from app.models.task import Task  # noqa: F401
 
-
-@pytest.fixture(scope="session")
-async def test_engine():
-    """Create a test database engine."""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
+    async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    await engine.dispose()
+    yield
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest.fixture
-async def test_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
-    """Create a test database session."""
-    async_session_factory = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-    async with async_session_factory() as session:
+@pytest_asyncio.fixture
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Provide a test database session."""
+    async with TestSessionFactory() as session:
         yield session
-        await session.rollback()
 
 
-@pytest.fixture
-async def client(test_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    """Create an async test client."""
+@pytest_asyncio.fixture
+async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    """Provide an async test client with overridden DB dependency."""
+    from app.main import app
 
-    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-        yield test_session
+    async def override_get_db():
+        try:
+            yield db_session
+            await db_session.commit()
+        except Exception:
+            await db_session.rollback()
+            raise
 
     app.dependency_overrides[get_db] = override_get_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
 
     app.dependency_overrides.clear()
 
 
-# Mock JWT data
-MOCK_USER_ID = "test-user-123"
-MOCK_USER_EMAIL = "test@example.com"
-MOCK_ADMIN_ID = "admin-user-456"
-MOCK_ADMIN_EMAIL = "admin@example.com"
-
-
-def create_mock_jwt_payload(
-    user_id: str = MOCK_USER_ID,
-    email: str = MOCK_USER_EMAIL,
-    role: str = "user",
-    exp_hours: int = 1,
-) -> dict[str, Any]:
-    """Create a mock JWT payload."""
-    now = datetime.now(timezone.utc)
-    return {
+def create_test_token(user_id: str, email: str = "test@example.com", role: str = "user") -> str:
+    """Generate a JWT token for testing."""
+    secret = settings.BETTER_AUTH_SECRET or "test-secret"
+    payload = {
         "sub": user_id,
+        "user_id": user_id,
         "email": email,
         "role": role,
-        "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(hours=exp_hours)).timestamp()),
-        "iss": "http://localhost:3000",
-        "aud": "http://localhost:8000",
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=24),
     }
+    return jwt.encode(payload, secret, algorithm="HS256")
 
 
-def create_expired_jwt_payload(user_id: str = MOCK_USER_ID) -> dict[str, Any]:
-    """Create an expired JWT payload."""
-    now = datetime.now(timezone.utc)
-    return {
-        "sub": user_id,
-        "email": MOCK_USER_EMAIL,
-        "role": "user",
-        "iat": int((now - timedelta(hours=2)).timestamp()),
-        "exp": int((now - timedelta(hours=1)).timestamp()),
-        "iss": "http://localhost:3000",
-        "aud": "http://localhost:8000",
-    }
+async def create_test_user(
+    db_session: AsyncSession,
+    email: str = "test@example.com",
+    name: str = "Test User",
+    password_hash: str | None = None,
+) -> tuple[str, str]:
+    """
+    Create a test user with account. Returns (user_id, token).
 
+    If password_hash is None, creates a bcrypt hash of 'TestPass1'.
+    """
+    from passlib.context import CryptContext
 
-@pytest.fixture
-def mock_valid_token() -> str:
-    """Return a mock valid JWT token string."""
-    return "valid-jwt-token-for-testing"
+    from app.models.account import Account
+    from app.models.user import User
 
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-@pytest.fixture
-def mock_expired_token() -> str:
-    """Return a mock expired JWT token string."""
-    return "expired-jwt-token-for-testing"
-
-
-@pytest.fixture
-def mock_invalid_token() -> str:
-    """Return a mock invalid JWT token string."""
-    return "invalid-jwt-token-for-testing"
-
-
-@pytest.fixture
-def mock_jwt_payload() -> dict[str, Any]:
-    """Return a mock JWT payload for a regular user."""
-    return create_mock_jwt_payload()
-
-
-@pytest.fixture
-def mock_admin_jwt_payload() -> dict[str, Any]:
-    """Return a mock JWT payload for an admin user."""
-    return create_mock_jwt_payload(
-        user_id=MOCK_ADMIN_ID,
-        email=MOCK_ADMIN_EMAIL,
-        role="admin",
+    user_id = secrets.token_hex(16)
+    user = User(
+        id=user_id,
+        email=email,
+        name=name,
+        email_verified=False,
+        role="user",
+        banned=False,
     )
+    db_session.add(user)
 
+    account = Account(
+        id=secrets.token_hex(16),
+        user_id=user_id,
+        account_id=email,
+        provider_id="credential",
+        password=password_hash or pwd_context.hash("TestPass1"),
+    )
+    db_session.add(account)
+    await db_session.commit()
 
-@pytest.fixture
-def mock_auth_service():
-    """Create a mock auth service for testing."""
-    mock_service = MagicMock()
-    mock_service.verify_token = AsyncMock(return_value=create_mock_jwt_payload())
-    mock_service.get_jwks = AsyncMock(return_value={"keys": []})
-    return mock_service
+    token = create_test_token(user_id, email)
+    return user_id, token

@@ -16,6 +16,7 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from app.models.account import Account
     from app.models.session import Session
+    from app.models.task import Task
 
 
 class User(Base):
@@ -68,6 +69,9 @@ class User(Base):
     )
     accounts: Mapped[List["Account"]] = relationship(
         "Account", back_populates="user", cascade="all, delete-orphan"
+    )
+    tasks: Mapped[List["Task"]] = relationship(
+        "Task", back_populates="user", cascade="all, delete-orphan"
     )
 
     # Indexes
